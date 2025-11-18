@@ -20,6 +20,7 @@ async def get_auth_url(provider: str, state: str = None):
 
         auth_url = await oauth_service.generate_oauth_url(oauth_provider, state)
 
+        
         return AuthUrlResponse(auth_url=auth_url)
 
     except ValueError as e:
