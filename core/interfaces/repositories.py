@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from bson import ObjectId
 
 
 class User:
@@ -81,4 +82,86 @@ class ProviderTokenRepository(ABC):
         expiry: datetime
     ) -> ProviderToken:
         """Update existing provider tokens"""
+        pass
+
+
+class Contact:
+    """Contact domain model"""
+    def __init__(
+        self,
+        id: str,
+        user_id: str,
+        email: str,
+        name: Optional[str],
+        company: Optional[str],
+        phone: Optional[str],
+        custom_fields: Dict[str, Any],
+        source: str,
+        created_at: datetime,
+        updated_at: datetime
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.email = email
+        self.name = name
+        self.company = company
+        self.phone = phone
+        self.custom_fields = custom_fields
+        self.source = source
+        self.created_at = created_at
+        self.updated_at = updated_at
+
+
+class ContactRepository(ABC):
+    """Abstract repository for contact operations"""
+
+    @abstractmethod
+    async def create_contact(
+        self,
+        user_id: str,
+        email: str,
+        name: Optional[str],
+        company: Optional[str],
+        phone: Optional[str],
+        custom_fields: Dict[str, Any],
+        source: str
+    ) -> Contact:
+        """Create a new contact"""
+        pass
+
+    @abstractmethod
+    async def bulk_create_contacts(
+        self,
+        contacts_data: List[Dict[str, Any]]
+    ) -> List[Contact]:
+        """Create multiple contacts in bulk"""
+        pass
+
+    @abstractmethod
+    async def get_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Contact]:
+        """Get contacts by user ID with pagination"""
+        pass
+
+    @abstractmethod
+    async def get_by_user_and_email(
+        self,
+        user_id: str,
+        email: str
+    ) -> Optional[Contact]:
+        """Get contact by user ID and email"""
+        pass
+
+    @abstractmethod
+    async def delete_by_id(self, contact_id: str) -> bool:
+        """Delete a contact by ID"""
+        pass
+
+    @abstractmethod
+    async def count_by_user(self, user_id: str) -> int:
+        """Count total contacts for a user"""
         pass

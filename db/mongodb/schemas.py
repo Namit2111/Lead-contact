@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from pydantic_core import core_schema
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 
@@ -50,6 +50,25 @@ class ProviderTokenDocument(BaseModel):
     refresh_token: str
     expiry: datetime
     scope: List[str]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
+class ContactDocument(BaseModel):
+    """MongoDB document schema for contacts collection"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    email: str
+    name: Optional[str] = None
+    company: Optional[str] = None
+    phone: Optional[str] = None
+    custom_fields: Dict[str, Any] = Field(default_factory=dict)
+    source: str  # CSV filename
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
