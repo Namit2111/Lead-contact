@@ -30,7 +30,7 @@ async def get_auth_url(provider: str, state: str = None):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/auth/{provider}/callback", response_model=OAuthCallbackResponse)
+@router.get("/oauth/callback/{provider}", response_model=OAuthCallbackResponse)
 async def oauth_callback(
     provider: str,
     code: str = Query(..., description="Authorization code from OAuth provider"),

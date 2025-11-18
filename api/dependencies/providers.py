@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 # Provider registry - maps provider names to OAuth provider instances
 PROVIDER_REGISTRY: Dict[str, OAuthProvider] = {
-    "gmail": GmailOAuthProvider()
+    "google": GmailOAuthProvider()
 }
 
 # Service instances - initialized lazily

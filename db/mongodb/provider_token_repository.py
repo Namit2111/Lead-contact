@@ -12,7 +12,7 @@ class MongoProviderTokenRepository(ProviderTokenRepository):
     """MongoDB implementation of ProviderTokenRepository"""
 
     def __init__(self, database: Optional[AsyncIOMotorDatabase] = None):
-        self.database = database or get_database()
+        self.database = database if database is not None else get_database()
         self.collection = self.database["provider_tokens"]
 
     async def save_tokens(

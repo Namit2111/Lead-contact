@@ -20,9 +20,9 @@ class OAuthService:
     async def _ensure_repos_initialized(self):
         """Ensure repositories are initialized"""
         if not self._initialized:
-            if not self.user_repo:
+            if self.user_repo is None:
                 self.user_repo = await get_user_repository()
-            if not self.token_repo:
+            if self.token_repo is None:
                 self.token_repo = await get_provider_token_repository()
             self._initialized = True
 

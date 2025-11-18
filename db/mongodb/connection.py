@@ -24,13 +24,13 @@ class MongoDBConnection:
 
     async def disconnect(self):
         """Disconnect from MongoDB"""
-        if self.client:
+        if self.client is not None:
             self.client.close()
             logger.info("Disconnected from MongoDB")
 
     def get_database(self) -> AsyncIOMotorDatabase:
         """Get the database instance"""
-        if not self.database:
+        if self.database is None:
             raise RuntimeError("Database not connected. Call connect() first.")
         return self.database
 

@@ -14,13 +14,13 @@ class RepositoryFactory:
 
     async def create_user_repository(self) -> UserRepository:
         """Create user repository instance"""
-        if not self.database:
+        if self.database is None:
             self.database = mongodb_connection.get_database()
         return MongoUserRepository(self.database)
 
     async def create_provider_token_repository(self) -> ProviderTokenRepository:
         """Create provider token repository instance"""
-        if not self.database:
+        if self.database is None:
             self.database = mongodb_connection.get_database()
         return MongoProviderTokenRepository(self.database)
 

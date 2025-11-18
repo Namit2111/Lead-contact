@@ -18,7 +18,7 @@ class TokenRefresher:
     async def _ensure_repo_initialized(self):
         """Ensure token repository is initialized"""
         if not self._initialized:
-            if not self.token_repo:
+            if self.token_repo is None:
                 self.token_repo = await get_provider_token_repository()
             self._initialized = True
 

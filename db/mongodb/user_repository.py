@@ -11,7 +11,7 @@ class MongoUserRepository(UserRepository):
     """MongoDB implementation of UserRepository"""
 
     def __init__(self, database: Optional[AsyncIOMotorDatabase] = None):
-        self.database = database or get_database()
+        self.database = database if database is not None else get_database()
         self.collection = self.database["users"]
 
     async def get_by_email(self, email: str) -> Optional[User]:
