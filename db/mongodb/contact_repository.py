@@ -134,3 +134,48 @@ class MongoContactRepository(ContactRepository):
         count = await self.collection.count_documents({"user_id": ObjectId(user_id)})
         return count
 
+    async def get_csv_uploads_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get list of CSV uploads with contact counts for a user"""
+        pipeline = [
+            {"$match": {"user_id": ObjectId(user_id)}},
+            {
+                "$group": {
+                    "_id": "$source",
+                    "contact_count": {"$sum": 1},
+                    "first_uploaded": {"$min": "$created_at"},
+                    "last_uploaded": {"$max": "$created_at"}
+                }
+            },
+            {"$sort": {"last_uploaded": -1}}
+        ]
+        
+        cursor = self.collection.aggregate(pipeline)
+        results = await cursor.to_list(length=None)
+        
+        uploads = []
+        for result in results:
+            uploads.append({
+                "source": result["_id"],
+                "contact_count": result["contact_count"],
+                "first_uploaded": result["first_uploaded"],
+                "last_uploaded": result["last_uploaded"]
+            })
+        
+        return uploads
+
+    async def get_contacts_by_source(
+        self,
+        user_id: str,
+        source: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Contact]:
+        """Get contacts by user ID and CSV source"""
+        cursor = self.collection.find({
+            "user_id": ObjectId(user_id),
+            "source": source
+        }).sort("created_at", -1).skip(skip).limit(limit)
+
+        contacts = await cursor.to_list(length=limit)
+        return [self._document_to_domain(doc) for doc in contacts]
+

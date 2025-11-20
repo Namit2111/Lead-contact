@@ -5,7 +5,9 @@ from core.csv.models import (
     ContactListResponse,
     ContactStatsResponse,
     DeleteContactResponse,
-    ContactItem
+    ContactItem,
+    CsvUploadsListResponse,
+    CsvUploadItem
 )
 from core.csv.csv_service import CsvService
 from db.repository_factory import get_contact_repository
@@ -245,5 +247,94 @@ async def get_contact_stats(
         
     except Exception as e:
         logger.error(f"Error getting contact stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/uploads", response_model=CsvUploadsListResponse)
+async def get_csv_uploads(
+    x_user_id: Optional[str] = Header(None)
+):
+    """Get list of CSV uploads for user"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        contact_repo = await get_contact_repository()
+        
+        # Get CSV uploads grouped by source
+        uploads = await contact_repo.get_csv_uploads_by_user(user_id)
+        
+        # Convert to response models
+        upload_items = [
+            CsvUploadItem(
+                source=upload["source"],
+                contact_count=upload["contact_count"],
+                first_uploaded=upload["first_uploaded"],
+                last_uploaded=upload["last_uploaded"]
+            )
+            for upload in uploads
+        ]
+        
+        return CsvUploadsListResponse(
+            uploads=upload_items,
+            total_uploads=len(upload_items)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting CSV uploads: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/by-source/{source}", response_model=ContactListResponse)
+async def get_contacts_by_source(
+    source: str,
+    x_user_id: Optional[str] = Header(None),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Items per page")
+):
+    """Get contacts from a specific CSV source"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        contact_repo = await get_contact_repository()
+        
+        # Calculate pagination
+        skip = (page - 1) * page_size
+        
+        # Get contacts by source
+        contacts = await contact_repo.get_contacts_by_source(
+            user_id, source, skip=skip, limit=page_size
+        )
+        
+        # Get total count for this source
+        all_contacts = await contact_repo.get_contacts_by_source(
+            user_id, source, skip=0, limit=10000
+        )
+        total = len(all_contacts)
+        
+        # Convert to response models
+        contact_items = [
+            ContactItem(
+                id=contact.id,
+                email=contact.email,
+                name=contact.name,
+                company=contact.company,
+                phone=contact.phone,
+                custom_fields=contact.custom_fields,
+                source=contact.source,
+                created_at=contact.created_at,
+                updated_at=contact.updated_at
+            )
+            for contact in contacts
+        ]
+        
+        return ContactListResponse(
+            contacts=contact_items,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting contacts by source: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

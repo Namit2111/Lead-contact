@@ -165,3 +165,19 @@ class ContactRepository(ABC):
     async def count_by_user(self, user_id: str) -> int:
         """Count total contacts for a user"""
         pass
+
+    @abstractmethod
+    async def get_csv_uploads_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get list of CSV uploads with contact counts for a user"""
+        pass
+
+    @abstractmethod
+    async def get_contacts_by_source(
+        self,
+        user_id: str,
+        source: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Contact]:
+        """Get contacts by user ID and CSV source"""
+        pass

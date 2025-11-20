@@ -41,6 +41,20 @@ class ContactStatsResponse(BaseModel):
     sources: Dict[str, int] = Field(default_factory=dict)
 
 
+class CsvUploadItem(BaseModel):
+    """Single CSV upload item"""
+    source: str
+    contact_count: int
+    first_uploaded: datetime
+    last_uploaded: datetime
+
+
+class CsvUploadsListResponse(BaseModel):
+    """Response for listing CSV uploads"""
+    uploads: List[CsvUploadItem]
+    total_uploads: int
+
+
 class DeleteContactResponse(BaseModel):
     """Response for contact deletion"""
     success: bool
