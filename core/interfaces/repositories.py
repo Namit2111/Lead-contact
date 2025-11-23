@@ -181,3 +181,82 @@ class ContactRepository(ABC):
     ) -> List[Contact]:
         """Get contacts by user ID and CSV source"""
         pass
+
+
+class Template:
+    """Template domain model"""
+    def __init__(
+        self,
+        id: str,
+        user_id: str,
+        name: str,
+        subject: str,
+        body: str,
+        variables: List[str],
+        is_active: bool,
+        created_at: datetime,
+        updated_at: datetime
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.name = name
+        self.subject = subject
+        self.body = body
+        self.variables = variables
+        self.is_active = is_active
+        self.created_at = created_at
+        self.updated_at = updated_at
+
+
+class TemplateRepository(ABC):
+    """Abstract repository for template operations"""
+
+    @abstractmethod
+    async def create_template(
+        self,
+        user_id: str,
+        name: str,
+        subject: str,
+        body: str,
+        variables: List[str]
+    ) -> Template:
+        """Create a new template"""
+        pass
+
+    @abstractmethod
+    async def get_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Template]:
+        """Get templates by user ID with pagination"""
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, template_id: str) -> Optional[Template]:
+        """Get template by ID"""
+        pass
+
+    @abstractmethod
+    async def update_template(
+        self,
+        template_id: str,
+        name: Optional[str] = None,
+        subject: Optional[str] = None,
+        body: Optional[str] = None,
+        variables: Optional[List[str]] = None,
+        is_active: Optional[bool] = None
+    ) -> Template:
+        """Update an existing template"""
+        pass
+
+    @abstractmethod
+    async def delete_by_id(self, template_id: str) -> bool:
+        """Delete a template by ID"""
+        pass
+
+    @abstractmethod
+    async def count_by_user(self, user_id: str) -> int:
+        """Count total templates for a user"""
+        pass

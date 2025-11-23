@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes.auth_routes import router as auth_router
 from api.routes.provider_routes import router as provider_router
 from api.routes.contact_routes import router as contact_router
+from api.routes.template_routes import router as template_router
 from db.mongodb.connection import mongodb_connection
 from utils.logger import logger
 import uvicorn
@@ -47,6 +48,7 @@ async def shutdown_event():
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(provider_router, tags=["Providers"])
 app.include_router(contact_router, tags=["Contacts"])
+app.include_router(template_router, tags=["Templates"])
 
 
 @app.get("/")
