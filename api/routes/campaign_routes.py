@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Depends
 from typing import Optional
 from core.campaigns.models import (
     SendCampaignRequest,
@@ -11,6 +11,7 @@ from core.campaigns.models import (
 )
 from core.campaigns.campaign_service import CampaignService
 from db.repository_factory import get_email_log_repository
+from api.dependencies.gmail_token import get_valid_gmail_token
 from utils.logger import logger
 
 
@@ -51,7 +52,8 @@ async def preview_campaign(
 @router.post("/send", response_model=CampaignResultResponse)
 async def send_campaign(
     request: SendCampaignRequest,
-    x_user_id: Optional[str] = Header(None)
+    x_user_id: Optional[str] = Header(None),
+    gmail_token: str = Depends(get_valid_gmail_token)
 ):
     """Send email campaign to all contacts in CSV"""
     user_id = get_user_id_from_header(x_user_id)
@@ -60,7 +62,8 @@ async def send_campaign(
         results = await CampaignService.send_campaign(
             user_id=user_id,
             csv_source=request.csv_source,
-            template_id=request.template_id
+            template_id=request.template_id,
+            access_token=gmail_token
         )
         
         message_parts = []

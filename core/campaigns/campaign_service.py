@@ -6,10 +6,8 @@ from providers.gmail.gmail_send_service import GmailSendService
 from db.repository_factory import (
     get_contact_repository,
     get_template_repository,
-    get_provider_token_repository,
     get_email_log_repository
 )
-from core.auth.token_refresher import TokenRefresher
 from utils.logger import logger
 
 
@@ -20,7 +18,8 @@ class CampaignService:
     async def send_campaign(
         user_id: str,
         csv_source: str,
-        template_id: str
+        template_id: str,
+        access_token: str
     ) -> Dict[str, Any]:
         """
         Send email campaign to all contacts in a CSV source
@@ -39,7 +38,6 @@ class CampaignService:
             # Get repositories
             contact_repo = await get_contact_repository()
             template_repo = await get_template_repository()
-            token_repo = await get_provider_token_repository()
             log_repo = await get_email_log_repository()
             
             # Get template
@@ -57,15 +55,7 @@ class CampaignService:
             if not contacts:
                 raise ValueError(f"No contacts found in {csv_source}")
             
-            # Get user's OAuth token
-            provider_token = await token_repo.get_by_user_and_provider(user_id, "google")
-            if not provider_token:
-                raise ValueError("No Google account connected. Please connect your Gmail account.")
-            
-            # Get access token (refresh if needed)
-            # For now, just use the access token directly
-            # TODO: Implement token refresh check
-            access_token = provider_token.access_token
+            # access_token is now passed from the route (already validated and refreshed)
             
             # Send emails
             results = {
