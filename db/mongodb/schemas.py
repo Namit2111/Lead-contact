@@ -94,3 +94,24 @@ class TemplateDocument(BaseModel):
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
+
+
+class EmailLogDocument(BaseModel):
+    """MongoDB document schema for email_logs collection"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    campaign_id: Optional[str] = None  # Group emails from same campaign
+    contact_id: PyObjectId
+    template_id: PyObjectId
+    to_email: str
+    subject: str
+    body: str
+    status: str  # 'sent', 'failed', 'pending'
+    error_message: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}

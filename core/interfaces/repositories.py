@@ -260,3 +260,85 @@ class TemplateRepository(ABC):
     async def count_by_user(self, user_id: str) -> int:
         """Count total templates for a user"""
         pass
+
+
+class EmailLog:
+    """Email log domain model"""
+    def __init__(
+        self,
+        id: str,
+        user_id: str,
+        campaign_id: Optional[str],
+        contact_id: str,
+        template_id: str,
+        to_email: str,
+        subject: str,
+        body: str,
+        status: str,
+        error_message: Optional[str],
+        sent_at: Optional[datetime],
+        created_at: datetime
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.campaign_id = campaign_id
+        self.contact_id = contact_id
+        self.template_id = template_id
+        self.to_email = to_email
+        self.subject = subject
+        self.body = body
+        self.status = status
+        self.error_message = error_message
+        self.sent_at = sent_at
+        self.created_at = created_at
+
+
+class EmailLogRepository(ABC):
+    """Abstract repository for email log operations"""
+
+    @abstractmethod
+    async def create_log(
+        self,
+        user_id: str,
+        campaign_id: Optional[str],
+        contact_id: str,
+        template_id: str,
+        to_email: str,
+        subject: str,
+        body: str,
+        status: str,
+        error_message: Optional[str] = None,
+        sent_at: Optional[datetime] = None
+    ) -> EmailLog:
+        """Create a new email log entry"""
+        pass
+
+    @abstractmethod
+    async def get_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[EmailLog]:
+        """Get email logs by user ID with pagination"""
+        pass
+
+    @abstractmethod
+    async def get_by_campaign(
+        self,
+        campaign_id: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[EmailLog]:
+        """Get email logs by campaign ID"""
+        pass
+
+    @abstractmethod
+    async def count_by_user(self, user_id: str) -> int:
+        """Count total email logs for a user"""
+        pass
+
+    @abstractmethod
+    async def get_campaign_stats(self, campaign_id: str) -> Dict[str, Any]:
+        """Get statistics for a campaign"""
+        pass
