@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 from datetime import datetime
 from bson import ObjectId
 
@@ -341,4 +342,103 @@ class EmailLogRepository(ABC):
     @abstractmethod
     async def get_campaign_stats(self, campaign_id: str) -> Dict[str, Any]:
         """Get statistics for a campaign"""
+        pass
+
+
+# Campaign Models
+class Campaign(BaseModel):
+    """Campaign domain model"""
+    id: str
+    user_id: str
+    name: str
+    csv_source: str
+    template_id: str
+    status: str
+    total_contacts: int
+    processed: int
+    sent: int
+    failed: int
+    trigger_run_id: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
+
+
+class CampaignRepository(ABC):
+    """Abstract repository for campaign operations"""
+
+    @abstractmethod
+    async def create_campaign(
+        self,
+        user_id: str,
+        name: str,
+        csv_source: str,
+        template_id: str,
+        total_contacts: int,
+        status: str = "queued"
+    ) -> Campaign:
+        """Create a new campaign"""
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, campaign_id: str) -> Optional[Campaign]:
+        """Get campaign by ID"""
+        pass
+
+    @abstractmethod
+    async def get_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Campaign]:
+        """Get campaigns by user ID"""
+        pass
+
+    @abstractmethod
+    async def update_status(
+        self,
+        campaign_id: str,
+        status: str,
+        error_message: Optional[str] = None
+    ) -> Optional[Campaign]:
+        """Update campaign status"""
+        pass
+
+    @abstractmethod
+    async def update_progress(
+        self,
+        campaign_id: str,
+        processed: int,
+        sent: int,
+        failed: int
+    ) -> Optional[Campaign]:
+        """Update campaign progress"""
+        pass
+
+    @abstractmethod
+    async def set_trigger_run_id(
+        self,
+        campaign_id: str,
+        trigger_run_id: str
+    ) -> Optional[Campaign]:
+        """Set Trigger.dev run ID"""
+        pass
+
+    @abstractmethod
+    async def count_by_user(self, user_id: str) -> int:
+        """Count total campaigns for a user"""
+        pass
+
+    @abstractmethod
+    async def get_by_status(
+        self,
+        user_id: str,
+        status: str,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Campaign]:
+        """Get campaigns by status"""
         pass

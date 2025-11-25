@@ -12,6 +12,14 @@ class Settings(BaseSettings):
     mongo_uri: str
     mongo_db_name: str
 
+    # Trigger.dev settings
+    trigger_api_key: Optional[str] = None
+    trigger_api_url: str = "https://api.trigger.dev"
+    trigger_webhook_secret: Optional[str] = None
+    
+    # Backend URL (for Trigger.dev callbacks)
+    backend_url: str = "http://localhost:8000"
+
     # Optional settings
     debug: bool = False
     log_level: str = "INFO"

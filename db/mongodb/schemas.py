@@ -96,6 +96,31 @@ class TemplateDocument(BaseModel):
         json_encoders = {ObjectId: str}
 
 
+class CampaignDocument(BaseModel):
+    """MongoDB document schema for campaigns collection"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    name: str
+    csv_source: str
+    template_id: PyObjectId
+    status: str  # 'queued', 'running', 'paused', 'completed', 'failed', 'cancelled'
+    total_contacts: int = 0
+    processed: int = 0
+    sent: int = 0
+    failed: int = 0
+    trigger_run_id: Optional[str] = None  # Trigger.dev run ID for tracking
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
 class EmailLogDocument(BaseModel):
     """MongoDB document schema for email_logs collection"""
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")

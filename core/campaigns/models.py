@@ -3,10 +3,11 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 
-class SendCampaignRequest(BaseModel):
-    """Request to send email campaign"""
+class CreateCampaignRequest(BaseModel):
+    """Request to create and queue email campaign via Trigger.dev"""
     csv_source: str
     template_id: str
+    name: Optional[str] = None  # Auto-generated if not provided
 
 
 class PreviewCampaignRequest(BaseModel):
@@ -28,11 +29,57 @@ class CampaignResultResponse(BaseModel):
     """Response for campaign send"""
     success: bool
     campaign_id: str
-    total: int
+    total: int = 0
+    sent: int = 0
+    failed: int = 0
+    message: str
+    status: str = "queued"
+    errors: List[Dict[str, str]] = []
+
+
+class CampaignItem(BaseModel):
+    """Single campaign item"""
+    id: str
+    name: str
+    csv_source: str
+    template_id: str
+    status: str
+    total_contacts: int
+    processed: int
     sent: int
     failed: int
-    message: str
-    errors: List[Dict[str, str]] = []
+    trigger_run_id: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
+
+
+class CampaignsListResponse(BaseModel):
+    """Response for campaigns list"""
+    campaigns: List[CampaignItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class CampaignDetailResponse(BaseModel):
+    """Response for campaign details"""
+    campaign: CampaignItem
+
+
+class UpdateCampaignStatusRequest(BaseModel):
+    """Request to update campaign status"""
+    status: str
+    error_message: Optional[str] = None
+
+
+class UpdateCampaignProgressRequest(BaseModel):
+    """Request to update campaign progress"""
+    processed: int
+    sent: int
+    failed: int
 
 
 class EmailLogItem(BaseModel):
