@@ -114,7 +114,7 @@ class CampaignDocument(BaseModel):
     auto_reply_enabled: bool = True
     auto_reply_subject: str = "Re: {{original_subject}}"
     auto_reply_body: str = "Thank you for your reply! We have received your message and will get back to you shortly."
-    max_replies_per_thread: int = 3
+    max_replies_per_thread: int = 5
     replies_count: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None

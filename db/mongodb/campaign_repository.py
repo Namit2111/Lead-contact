@@ -36,7 +36,7 @@ class MongoCampaignRepository(CampaignRepository):
             auto_reply_enabled=doc.get("auto_reply_enabled", True),
             auto_reply_subject=doc.get("auto_reply_subject", "Re: {{original_subject}}"),
             auto_reply_body=doc.get("auto_reply_body", "Thank you for your reply! We have received your message and will get back to you shortly."),
-            max_replies_per_thread=doc.get("max_replies_per_thread", 3),
+            max_replies_per_thread=doc.get("max_replies_per_thread", 5),
             replies_count=doc.get("replies_count", 0),
             created_at=doc["created_at"],
             started_at=doc.get("started_at"),

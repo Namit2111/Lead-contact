@@ -54,7 +54,7 @@ class CampaignItem(BaseModel):
     auto_reply_enabled: bool = True
     auto_reply_subject: str = "Re: {{original_subject}}"
     auto_reply_body: str = "Thank you for your reply!"
-    max_replies_per_thread: int = 3
+    max_replies_per_thread: int = 5
     replies_count: int = 0
     created_at: datetime
     started_at: Optional[datetime] = None

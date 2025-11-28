@@ -303,3 +303,32 @@ async def get_users_with_auto_reply():
         logger.error(f"Error fetching users with auto-reply: {str(e)}")
         return {"users": []}
 
+
+@router.get("/conversation-history/{conversation_id}")
+async def get_conversation_history(conversation_id: str):
+    """
+    Get conversation history for AI context
+    Returns messages in chronological order
+    """
+    try:
+        conv_repo = await get_conversation_repository()
+        
+        messages = await conv_repo.get_messages(conversation_id)
+        
+        return {
+            "messages": [
+                {
+                    "direction": msg.direction,
+                    "subject": msg.subject,
+                    "body": msg.body[:500] if msg.body else "",  # Truncate for context
+                    "is_auto_reply": msg.is_auto_reply,
+                    "sent_at": msg.sent_at.isoformat() if msg.sent_at else None
+                }
+                for msg in messages
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching conversation history: {str(e)}")
+        return {"messages": []}
+
