@@ -161,6 +161,11 @@ async def list_campaigns(
                 failed=c.failed,
                 trigger_run_id=c.trigger_run_id,
                 error_message=c.error_message,
+                auto_reply_enabled=c.auto_reply_enabled,
+                auto_reply_subject=c.auto_reply_subject,
+                auto_reply_body=c.auto_reply_body,
+                max_replies_per_thread=c.max_replies_per_thread,
+                replies_count=c.replies_count,
                 created_at=c.created_at,
                 started_at=c.started_at,
                 completed_at=c.completed_at,
@@ -178,6 +183,58 @@ async def list_campaigns(
         
     except Exception as e:
         logger.error(f"Error listing campaigns: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/logs", response_model=EmailLogsResponse)
+async def get_all_email_logs(
+    x_user_id: Optional[str] = Header(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    status: Optional[str] = Query(None)
+):
+    """Get all email logs for the user across all campaigns"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        log_repo = await get_email_log_repository()
+        
+        skip = (page - 1) * page_size
+        
+        if status:
+            logs = await log_repo.get_by_user_and_status(
+                user_id, status, skip=skip, limit=page_size
+            )
+            total = await log_repo.count_by_user_and_status(user_id, status)
+        else:
+            logs = await log_repo.get_by_user(
+                user_id, skip=skip, limit=page_size
+            )
+            total = await log_repo.count_by_user(user_id)
+        
+        log_items = [
+            EmailLogItem(
+                id=log.id,
+                campaign_id=log.campaign_id,
+                to_email=log.to_email,
+                subject=log.subject,
+                status=log.status,
+                error_message=log.error_message,
+                sent_at=log.sent_at,
+                created_at=log.created_at
+            )
+            for log in logs
+        ]
+        
+        return EmailLogsResponse(
+            logs=log_items,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting email logs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -211,6 +268,11 @@ async def get_campaign(
             failed=campaign.failed,
             trigger_run_id=campaign.trigger_run_id,
             error_message=campaign.error_message,
+            auto_reply_enabled=campaign.auto_reply_enabled,
+            auto_reply_subject=campaign.auto_reply_subject,
+            auto_reply_body=campaign.auto_reply_body,
+            max_replies_per_thread=campaign.max_replies_per_thread,
+            replies_count=campaign.replies_count,
             created_at=campaign.created_at,
             started_at=campaign.started_at,
             completed_at=campaign.completed_at,
@@ -357,5 +419,306 @@ async def get_campaign_stats(
         
     except Exception as e:
         logger.error(f"Error getting campaign stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{campaign_id}/emails", response_model=EmailLogsResponse)
+async def get_campaign_emails(
+    campaign_id: str,
+    x_user_id: Optional[str] = Header(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100)
+):
+    """Get email logs for a specific campaign"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        # Verify user owns this campaign
+        campaign_repo = await get_campaign_repository()
+        campaign = await campaign_repo.get_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied to campaign")
+        
+        log_repo = await get_email_log_repository()
+        
+        skip = (page - 1) * page_size
+        logs = await log_repo.get_by_campaign(campaign_id, skip=skip, limit=page_size)
+        total = await log_repo.count_by_campaign(campaign_id)
+        
+        log_items = [
+            EmailLogItem(
+                id=log.id,
+                campaign_id=log.campaign_id,
+                to_email=log.to_email,
+                subject=log.subject,
+                status=log.status,
+                error_message=log.error_message,
+                sent_at=log.sent_at,
+                created_at=log.created_at
+            )
+            for log in logs
+        ]
+        
+        return EmailLogsResponse(
+            logs=log_items,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting campaign emails: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== AUTO-REPLY ENDPOINTS ==============
+
+from pydantic import BaseModel
+from db.repository_factory import get_conversation_repository
+
+
+class UpdateAutoReplyRequest(BaseModel):
+    """Request to update auto-reply settings"""
+    enabled: bool
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    max_replies: Optional[int] = None
+
+
+class AutoReplySettingsResponse(BaseModel):
+    """Response with auto-reply settings"""
+    auto_reply_enabled: bool
+    auto_reply_subject: str
+    auto_reply_body: str
+    max_replies_per_thread: int
+    replies_count: int
+
+
+@router.get("/{campaign_id}/auto-reply", response_model=AutoReplySettingsResponse)
+async def get_auto_reply_settings(
+    campaign_id: str,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Get auto-reply settings for a campaign"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        campaign_repo = await get_campaign_repository()
+        campaign = await campaign_repo.get_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return AutoReplySettingsResponse(
+            auto_reply_enabled=campaign.auto_reply_enabled,
+            auto_reply_subject=campaign.auto_reply_subject,
+            auto_reply_body=campaign.auto_reply_body,
+            max_replies_per_thread=campaign.max_replies_per_thread,
+            replies_count=campaign.replies_count
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting auto-reply settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{campaign_id}/auto-reply", response_model=AutoReplySettingsResponse)
+async def update_auto_reply_settings(
+    campaign_id: str,
+    request: UpdateAutoReplyRequest,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Update auto-reply settings for a campaign"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        campaign_repo = await get_campaign_repository()
+        campaign = await campaign_repo.get_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Update settings
+        updated = await campaign_repo.update_auto_reply(
+            campaign_id=campaign_id,
+            enabled=request.enabled,
+            subject=request.subject,
+            body=request.body,
+            max_replies=request.max_replies
+        )
+        
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update settings")
+        
+        return AutoReplySettingsResponse(
+            auto_reply_enabled=updated.auto_reply_enabled,
+            auto_reply_subject=updated.auto_reply_subject,
+            auto_reply_body=updated.auto_reply_body,
+            max_replies_per_thread=updated.max_replies_per_thread,
+            replies_count=updated.replies_count
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating auto-reply settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ConversationItem(BaseModel):
+    """Single conversation item"""
+    id: str
+    contact_email: str
+    gmail_thread_id: str
+    status: str
+    message_count: int
+    auto_replies_sent: int
+    last_message_at: Optional[datetime] = None
+    last_reply_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class ConversationsResponse(BaseModel):
+    """Response with conversations list"""
+    conversations: list[ConversationItem]
+    total: int
+
+
+@router.get("/{campaign_id}/conversations", response_model=ConversationsResponse)
+async def get_campaign_conversations(
+    campaign_id: str,
+    x_user_id: Optional[str] = Header(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100)
+):
+    """Get conversations for a campaign"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        campaign_repo = await get_campaign_repository()
+        campaign = await campaign_repo.get_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        conv_repo = await get_conversation_repository()
+        
+        skip = (page - 1) * page_size
+        conversations = await conv_repo.get_by_campaign(campaign_id, skip=skip, limit=page_size)
+        total = await conv_repo.count_by_campaign(campaign_id)
+        
+        return ConversationsResponse(
+            conversations=[
+                ConversationItem(
+                    id=c.id,
+                    contact_email=c.contact_email,
+                    gmail_thread_id=c.gmail_thread_id,
+                    status=c.status,
+                    message_count=c.message_count,
+                    auto_replies_sent=c.auto_replies_sent,
+                    last_message_at=c.last_message_at,
+                    last_reply_at=c.last_reply_at,
+                    created_at=c.created_at
+                )
+                for c in conversations
+            ],
+            total=total
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting conversations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MessageItem(BaseModel):
+    """Single message in conversation"""
+    id: str
+    direction: str
+    from_email: str
+    to_email: str
+    subject: str
+    body: str
+    is_auto_reply: bool
+    sent_at: datetime
+
+
+class ConversationDetailResponse(BaseModel):
+    """Response with conversation details"""
+    conversation: ConversationItem
+    messages: list[MessageItem]
+
+
+@router.get("/{campaign_id}/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+async def get_conversation_detail(
+    campaign_id: str,
+    conversation_id: str,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Get conversation with all messages"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        campaign_repo = await get_campaign_repository()
+        campaign = await campaign_repo.get_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        conv_repo = await get_conversation_repository()
+        
+        conversation = await conv_repo.get_by_id(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        messages = await conv_repo.get_messages(conversation_id)
+        
+        return ConversationDetailResponse(
+            conversation=ConversationItem(
+                id=conversation.id,
+                contact_email=conversation.contact_email,
+                gmail_thread_id=conversation.gmail_thread_id,
+                status=conversation.status,
+                message_count=conversation.message_count,
+                auto_replies_sent=conversation.auto_replies_sent,
+                last_message_at=conversation.last_message_at,
+                last_reply_at=conversation.last_reply_at,
+                created_at=conversation.created_at
+            ),
+            messages=[
+                MessageItem(
+                    id=m.id,
+                    direction=m.direction,
+                    from_email=m.from_email,
+                    to_email=m.to_email,
+                    subject=m.subject,
+                    body=m.body,
+                    is_auto_reply=m.is_auto_reply,
+                    sent_at=m.sent_at
+                )
+                for m in messages
+            ]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting conversation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -32,6 +32,12 @@ class MongoCampaignRepository(CampaignRepository):
             failed=doc["failed"],
             trigger_run_id=doc.get("trigger_run_id"),
             error_message=doc.get("error_message"),
+            # Auto-reply fields (with defaults for backwards compatibility)
+            auto_reply_enabled=doc.get("auto_reply_enabled", True),
+            auto_reply_subject=doc.get("auto_reply_subject", "Re: {{original_subject}}"),
+            auto_reply_body=doc.get("auto_reply_body", "Thank you for your reply! We have received your message and will get back to you shortly."),
+            max_replies_per_thread=doc.get("max_replies_per_thread", 3),
+            replies_count=doc.get("replies_count", 0),
             created_at=doc["created_at"],
             started_at=doc.get("started_at"),
             completed_at=doc.get("completed_at"),
@@ -229,5 +235,91 @@ class MongoCampaignRepository(CampaignRepository):
 
         except Exception as e:
             logger.error(f"Error getting campaigns by status for user {user_id}: {str(e)}")
+            return []
+
+    async def update_auto_reply(
+        self,
+        campaign_id: str,
+        enabled: bool,
+        subject: Optional[str] = None,
+        body: Optional[str] = None,
+        max_replies: Optional[int] = None
+    ) -> Optional[Campaign]:
+        """Update auto-reply settings for a campaign"""
+        try:
+            update_data = {
+                "auto_reply_enabled": enabled,
+                "updated_at": datetime.utcnow()
+            }
+            if subject is not None:
+                update_data["auto_reply_subject"] = subject
+            if body is not None:
+                update_data["auto_reply_body"] = body
+            if max_replies is not None:
+                update_data["max_replies_per_thread"] = max_replies
+
+            result = await self.collection.find_one_and_update(
+                {"_id": ObjectId(campaign_id)},
+                {"$set": update_data},
+                return_document=True
+            )
+
+            return self._document_to_campaign(result) if result else None
+
+        except Exception as e:
+            logger.error(f"Error updating auto-reply for campaign {campaign_id}: {str(e)}")
+            return None
+
+    async def increment_replies_count(self, campaign_id: str) -> Optional[Campaign]:
+        """Increment replies count for a campaign"""
+        try:
+            result = await self.collection.find_one_and_update(
+                {"_id": ObjectId(campaign_id)},
+                {
+                    "$inc": {"replies_count": 1},
+                    "$set": {"updated_at": datetime.utcnow()}
+                },
+                return_document=True
+            )
+            return self._document_to_campaign(result) if result else None
+        except Exception as e:
+            logger.error(f"Error incrementing replies count for campaign {campaign_id}: {str(e)}")
+            return None
+
+    async def get_campaigns_with_auto_reply(self, user_id: str) -> List[Campaign]:
+        """Get all campaigns with auto-reply enabled for a user"""
+        try:
+            cursor = self.collection.find({
+                "user_id": ObjectId(user_id),
+                "auto_reply_enabled": True,
+                "status": {"$in": ["completed", "running"]}
+            })
+
+            campaigns = []
+            async for doc in cursor:
+                campaigns.append(self._document_to_campaign(doc))
+
+            return campaigns
+
+        except Exception as e:
+            logger.error(f"Error getting auto-reply campaigns for user {user_id}: {str(e)}")
+            return []
+
+    async def get_all_auto_reply_campaigns(self) -> List[Campaign]:
+        """Get all campaigns with auto-reply enabled (across all users)"""
+        try:
+            cursor = self.collection.find({
+                "auto_reply_enabled": True,
+                "status": {"$in": ["completed", "running"]}
+            })
+
+            campaigns = []
+            async for doc in cursor:
+                campaigns.append(self._document_to_campaign(doc))
+
+            return campaigns
+
+        except Exception as e:
+            logger.error(f"Error getting all auto-reply campaigns: {str(e)}")
             return []
 

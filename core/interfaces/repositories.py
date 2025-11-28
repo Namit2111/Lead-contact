@@ -278,7 +278,10 @@ class EmailLog:
         status: str,
         error_message: Optional[str],
         sent_at: Optional[datetime],
-        created_at: datetime
+        created_at: datetime,
+        gmail_message_id: Optional[str] = None,
+        gmail_thread_id: Optional[str] = None,
+        reply_count: int = 0
     ):
         self.id = id
         self.user_id = user_id
@@ -292,6 +295,9 @@ class EmailLog:
         self.error_message = error_message
         self.sent_at = sent_at
         self.created_at = created_at
+        self.gmail_message_id = gmail_message_id
+        self.gmail_thread_id = gmail_thread_id
+        self.reply_count = reply_count
 
 
 class EmailLogRepository(ABC):
@@ -360,10 +366,49 @@ class Campaign(BaseModel):
     failed: int
     trigger_run_id: Optional[str] = None
     error_message: Optional[str] = None
+    # Auto-reply settings
+    auto_reply_enabled: bool = True
+    auto_reply_subject: str = "Re: {{original_subject}}"
+    auto_reply_body: str = "Thank you for your reply! We have received your message and will get back to you shortly."
+    max_replies_per_thread: int = 3
+    replies_count: int = 0
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     updated_at: datetime
+
+
+class Conversation(BaseModel):
+    """Conversation (email thread) domain model"""
+    id: str
+    user_id: str
+    campaign_id: str
+    email_log_id: str
+    contact_email: str
+    gmail_thread_id: str
+    status: str = "active"
+    message_count: int = 1
+    auto_replies_sent: int = 0
+    last_message_at: Optional[datetime] = None
+    last_reply_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationMessage(BaseModel):
+    """Message in a conversation"""
+    id: str
+    conversation_id: str
+    campaign_id: str
+    direction: str  # 'outbound' or 'inbound'
+    from_email: str
+    to_email: str
+    subject: str
+    body: str
+    gmail_message_id: str
+    is_auto_reply: bool = False
+    sent_at: datetime
+    created_at: datetime
 
 
 class CampaignRepository(ABC):

@@ -110,6 +110,12 @@ class CampaignDocument(BaseModel):
     failed: int = 0
     trigger_run_id: Optional[str] = None  # Trigger.dev run ID for tracking
     error_message: Optional[str] = None
+    # Auto-reply settings (enabled by default)
+    auto_reply_enabled: bool = True
+    auto_reply_subject: str = "Re: {{original_subject}}"
+    auto_reply_body: str = "Thank you for your reply! We have received your message and will get back to you shortly."
+    max_replies_per_thread: int = 3
+    replies_count: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -132,8 +138,54 @@ class EmailLogDocument(BaseModel):
     subject: str
     body: str
     status: str  # 'sent', 'failed', 'pending'
+    gmail_message_id: Optional[str] = None  # Gmail's message ID for tracking
+    gmail_thread_id: Optional[str] = None  # Gmail's thread ID for reply detection
     error_message: Optional[str] = None
     sent_at: Optional[datetime] = None
+    reply_count: int = 0  # How many auto-replies sent in this thread
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
+class ConversationDocument(BaseModel):
+    """MongoDB document schema for conversations collection (email threads)"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    campaign_id: str
+    email_log_id: str  # Reference to original sent email
+    contact_email: str
+    gmail_thread_id: str  # Gmail's thread ID
+    status: str = "active"  # 'active', 'paused', 'closed'
+    message_count: int = 1  # Total messages in thread
+    auto_replies_sent: int = 0
+    last_message_at: Optional[datetime] = None
+    last_reply_at: Optional[datetime] = None  # Last time they replied
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
+class ConversationMessageDocument(BaseModel):
+    """MongoDB document schema for conversation messages"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    conversation_id: PyObjectId
+    campaign_id: str
+    direction: str  # 'outbound' (us to them) or 'inbound' (them to us)
+    from_email: str
+    to_email: str
+    subject: str
+    body: str
+    gmail_message_id: str
+    is_auto_reply: bool = False
+    sent_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

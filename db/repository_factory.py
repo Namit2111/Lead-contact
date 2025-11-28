@@ -5,6 +5,7 @@ from db.mongodb.contact_repository import MongoContactRepository
 from db.mongodb.template_repository import MongoTemplateRepository
 from db.mongodb.email_log_repository import MongoEmailLogRepository
 from db.mongodb.campaign_repository import MongoCampaignRepository
+from db.mongodb.conversation_repository import MongoConversationRepository
 from db.mongodb.connection import get_database, mongodb_connection
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import Optional
@@ -52,6 +53,12 @@ class RepositoryFactory:
             self.database = mongodb_connection.get_database()
         return MongoCampaignRepository(self.database)
 
+    async def create_conversation_repository(self) -> MongoConversationRepository:
+        """Create conversation repository instance"""
+        if self.database is None:
+            self.database = mongodb_connection.get_database()
+        return MongoConversationRepository(self.database)
+
 
 # Global factory instance
 repository_factory = RepositoryFactory()
@@ -85,3 +92,8 @@ async def get_email_log_repository() -> EmailLogRepository:
 async def get_campaign_repository() -> CampaignRepository:
     """Convenience function to get campaign repository"""
     return await repository_factory.create_campaign_repository()
+
+
+async def get_conversation_repository() -> MongoConversationRepository:
+    """Convenience function to get conversation repository"""
+    return await repository_factory.create_conversation_repository()

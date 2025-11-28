@@ -50,6 +50,12 @@ class CampaignItem(BaseModel):
     failed: int
     trigger_run_id: Optional[str] = None
     error_message: Optional[str] = None
+    # Auto-reply settings
+    auto_reply_enabled: bool = True
+    auto_reply_subject: str = "Re: {{original_subject}}"
+    auto_reply_body: str = "Thank you for your reply!"
+    max_replies_per_thread: int = 3
+    replies_count: int = 0
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
