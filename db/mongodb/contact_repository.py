@@ -179,3 +179,15 @@ class MongoContactRepository(ContactRepository):
         contacts = await cursor.to_list(length=limit)
         return [self._document_to_domain(doc) for doc in contacts]
 
+    async def delete_by_source(self, user_id: str, source: str) -> int:
+        """Delete all contacts from a specific CSV source for a user"""
+        result = await self.collection.delete_many({
+            "user_id": ObjectId(user_id),
+            "source": source
+        })
+        
+        if result.deleted_count > 0:
+            logger.info(f"Deleted {result.deleted_count} contacts from source '{source}' for user {user_id}")
+        
+        return result.deleted_count
+

@@ -87,14 +87,11 @@ async def upload_contacts(
         # Get repository
         contact_repo = await get_contact_repository()
         
-        # Check for existing emails
-        existing_contacts = await contact_repo.get_by_user(user_id, skip=0, limit=10000)
-        existing_emails = {contact.email for contact in existing_contacts}
-        
-        # Detect duplicates
+        # Detect duplicates within the CSV file only (not across all contacts)
+        # Each CSV file is treated as a separate batch - same email can exist in different CSVs
         unique_contacts, duplicate_emails = await csv_service.detect_duplicates(
             contacts_data,
-            existing_emails
+            set()  # Empty set - only detect duplicates within this CSV
         )
         
         # Bulk create contacts
@@ -218,6 +215,34 @@ async def delete_contact(
         raise
     except Exception as e:
         logger.error(f"Error deleting contact: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/by-source/{source:path}", response_model=DeleteContactResponse)
+async def delete_contacts_by_source(
+    source: str,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Delete all contacts from a specific CSV source"""
+    user_id = get_user_id_from_header(x_user_id)
+    
+    try:
+        contact_repo = await get_contact_repository()
+        
+        deleted_count = await contact_repo.delete_by_source(user_id, source)
+        
+        if deleted_count > 0:
+            return DeleteContactResponse(
+                success=True,
+                message=f"Successfully deleted {deleted_count} contacts from '{source}'"
+            )
+        else:
+            raise HTTPException(status_code=404, detail=f"No contacts found for source '{source}'")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting contacts by source: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
