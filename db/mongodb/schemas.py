@@ -211,3 +211,23 @@ class ConversationMessageDocument(BaseModel):
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
+
+
+class CalendarTokenDocument(BaseModel):
+    """MongoDB document schema for calendar integration tokens"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    provider: str  # "cal.com"
+    api_key: str  # Cal.com API key (stored as-is, consider encryption in production)
+    username: str  # Cal.com username (e.g., "john" for cal.com/john)
+    event_type_id: Optional[int] = None  # Selected event type ID
+    event_type_slug: Optional[str] = None  # Selected event type slug (e.g., "30min")
+    event_type_name: Optional[str] = None  # Selected event type name
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}

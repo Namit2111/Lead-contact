@@ -13,6 +13,9 @@ from db.repository_factory import (
     get_provider_token_repository,
     get_prompt_repository
 )
+from db.mongodb.calendar_repository import MongoCalendarRepository
+from integrations.calcom_client import CalComClient
+from datetime import datetime, timedelta
 from utils.logger import logger
 
 
@@ -341,4 +344,116 @@ async def get_conversation_history(conversation_id: str):
     except Exception as e:
         logger.error(f"Error fetching conversation history: {str(e)}")
         return {"messages": []}
+
+
+@router.get("/calendar-availability/{user_id}")
+async def get_calendar_availability(user_id: str):
+    """
+    Get calendar availability for a user
+    Returns available slots for the next 7 days
+    """
+    try:
+        calendar_repo = MongoCalendarRepository()
+        token = await calendar_repo.get_by_user(user_id, "cal.com")
+
+        if not token:
+            return {
+                "connected": False,
+                "available_slots": [],
+                "booking_link": None
+            }
+
+        client = CalComClient(token["api_key"])
+        
+        # Get availability for next 7 days
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=7)
+        
+        slots = await client.get_availability(
+            event_type_id=token["event_type_id"],
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        # Format slots
+        formatted_slots = []
+        for slot in slots:
+            if isinstance(slot, dict) and "time" in slot:
+                formatted_slots.append({
+                    "date": slot.get("date"),
+                    "time": slot.get("time"),
+                    "duration": token.get("event_type_name", "30min")
+                })
+
+        # Build booking link
+        username = token["username"]
+        event_slug = token["event_type_slug"]
+        booking_link = f"https://cal.com/{username}/{event_slug}"
+
+        return {
+            "connected": True,
+            "available_slots": formatted_slots,
+            "booking_link": booking_link,
+            "event_type_name": token["event_type_name"]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching calendar availability: {str(e)}")
+        return {
+            "connected": False,
+            "available_slots": [],
+            "booking_link": None,
+            "error": str(e)
+        }
+
+
+@router.post("/book-meeting")
+async def book_meeting(request: dict):
+    """
+    Book a meeting directly via Cal.com
+    Expected payload:
+    {
+        "user_id": "...",
+        "start_time": "2024-12-02T14:00:00Z",
+        "end_time": "2024-12-02T14:30:00Z",
+        "attendee_email": "contact@example.com",
+        "attendee_name": "John Doe",
+        "notes": "Optional notes"
+    }
+    """
+    try:
+        user_id = request.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id required")
+
+        calendar_repo = MongoCalendarRepository()
+        token = await calendar_repo.get_by_user(user_id, "cal.com")
+
+        if not token:
+            raise HTTPException(status_code=404, detail="Calendar not connected")
+
+        client = CalComClient(token["api_key"])
+
+        # Parse times
+        start_time = datetime.fromisoformat(request["start_time"].replace("Z", "+00:00"))
+        end_time = datetime.fromisoformat(request["end_time"].replace("Z", "+00:00"))
+
+        booking = await client.create_booking(
+            event_type_id=token["event_type_id"],
+            start_time=start_time,
+            end_time=end_time,
+            attendee_email=request["attendee_email"],
+            attendee_name=request["attendee_name"],
+            notes=request.get("notes")
+        )
+
+        return {
+            "success": True,
+            "booking": booking,
+            "message": "Meeting booked successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Error booking meeting: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 

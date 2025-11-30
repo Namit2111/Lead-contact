@@ -6,6 +6,7 @@ from api.routes.contact_routes import router as contact_router
 from api.routes.template_routes import router as template_router
 from api.routes.campaign_routes import router as campaign_router
 from api.routes.prompt_routes import router as prompt_router
+from api.routes.calendar_routes import router as calendar_router
 from api.routes.internal_routes import router as internal_router
 from api.webhooks.trigger_webhooks import router as trigger_webhook_router
 from db.mongodb.connection import mongodb_connection
@@ -54,6 +55,7 @@ app.include_router(provider_router, tags=["Providers"])
 app.include_router(contact_router, tags=["Contacts"])
 app.include_router(template_router, tags=["Templates"])
 app.include_router(prompt_router, tags=["Prompts"])
+app.include_router(calendar_router, tags=["Calendar"])
 app.include_router(campaign_router, tags=["Campaigns"])
 app.include_router(internal_router, tags=["Internal"])
 app.include_router(trigger_webhook_router, tags=["Webhooks"])
