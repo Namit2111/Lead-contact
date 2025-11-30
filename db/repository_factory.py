@@ -1,4 +1,4 @@
-from core.interfaces.repositories import UserRepository, ProviderTokenRepository, ContactRepository, TemplateRepository, EmailLogRepository, CampaignRepository
+from core.interfaces.repositories import UserRepository, ProviderTokenRepository, ContactRepository, TemplateRepository, EmailLogRepository, CampaignRepository, PromptRepository
 from db.mongodb.user_repository import MongoUserRepository
 from db.mongodb.provider_token_repository import MongoProviderTokenRepository
 from db.mongodb.contact_repository import MongoContactRepository
@@ -6,6 +6,7 @@ from db.mongodb.template_repository import MongoTemplateRepository
 from db.mongodb.email_log_repository import MongoEmailLogRepository
 from db.mongodb.campaign_repository import MongoCampaignRepository
 from db.mongodb.conversation_repository import MongoConversationRepository
+from db.mongodb.prompt_repository import MongoPromptRepository
 from db.mongodb.connection import get_database, mongodb_connection
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import Optional
@@ -59,6 +60,12 @@ class RepositoryFactory:
             self.database = mongodb_connection.get_database()
         return MongoConversationRepository(self.database)
 
+    async def create_prompt_repository(self) -> PromptRepository:
+        """Create prompt repository instance"""
+        if self.database is None:
+            self.database = mongodb_connection.get_database()
+        return MongoPromptRepository(self.database)
+
 
 # Global factory instance
 repository_factory = RepositoryFactory()
@@ -97,3 +104,8 @@ async def get_campaign_repository() -> CampaignRepository:
 async def get_conversation_repository() -> MongoConversationRepository:
     """Convenience function to get conversation repository"""
     return await repository_factory.create_conversation_repository()
+
+
+async def get_prompt_repository() -> PromptRepository:
+    """Convenience function to get prompt repository"""
+    return await repository_factory.create_prompt_repository()

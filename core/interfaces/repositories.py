@@ -209,6 +209,95 @@ class Template:
         self.updated_at = updated_at
 
 
+class Prompt:
+    """AI Prompt domain model"""
+    def __init__(
+        self,
+        id: str,
+        user_id: str,
+        name: str,
+        description: Optional[str],
+        prompt_text: str,
+        is_default: bool,
+        is_active: bool,
+        created_at: datetime,
+        updated_at: datetime
+    ):
+        self.id = id
+        self.user_id = user_id
+        self.name = name
+        self.description = description
+        self.prompt_text = prompt_text
+        self.is_default = is_default
+        self.is_active = is_active
+        self.created_at = created_at
+        self.updated_at = updated_at
+
+
+class PromptRepository(ABC):
+    """Abstract repository for AI prompt operations"""
+
+    @abstractmethod
+    async def create_prompt(
+        self,
+        user_id: str,
+        name: str,
+        prompt_text: str,
+        description: Optional[str] = None,
+        is_default: bool = False
+    ) -> Prompt:
+        """Create a new prompt"""
+        pass
+
+    @abstractmethod
+    async def get_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Prompt]:
+        """Get prompts by user ID with pagination"""
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, prompt_id: str) -> Optional[Prompt]:
+        """Get prompt by ID"""
+        pass
+
+    @abstractmethod
+    async def get_default_for_user(self, user_id: str) -> Optional[Prompt]:
+        """Get user's default prompt"""
+        pass
+
+    @abstractmethod
+    async def update_prompt(
+        self,
+        prompt_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        prompt_text: Optional[str] = None,
+        is_default: Optional[bool] = None,
+        is_active: Optional[bool] = None
+    ) -> Optional[Prompt]:
+        """Update an existing prompt"""
+        pass
+
+    @abstractmethod
+    async def set_as_default(self, user_id: str, prompt_id: str) -> Optional[Prompt]:
+        """Set a prompt as the user's default (unsets other defaults)"""
+        pass
+
+    @abstractmethod
+    async def delete_by_id(self, prompt_id: str) -> bool:
+        """Delete a prompt by ID"""
+        pass
+
+    @abstractmethod
+    async def count_by_user(self, user_id: str) -> int:
+        """Count total prompts for a user"""
+        pass
+
+
 class TemplateRepository(ABC):
     """Abstract repository for template operations"""
 
@@ -359,6 +448,7 @@ class Campaign(BaseModel):
     name: str
     csv_source: str
     template_id: str
+    prompt_id: Optional[str] = None  # AI prompt for auto-replies
     status: str
     total_contacts: int
     processed: int
@@ -422,7 +512,8 @@ class CampaignRepository(ABC):
         csv_source: str,
         template_id: str,
         total_contacts: int,
-        status: str = "queued"
+        status: str = "queued",
+        prompt_id: Optional[str] = None
     ) -> Campaign:
         """Create a new campaign"""
         pass

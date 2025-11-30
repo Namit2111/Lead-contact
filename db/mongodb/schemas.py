@@ -96,6 +96,24 @@ class TemplateDocument(BaseModel):
         json_encoders = {ObjectId: str}
 
 
+class PromptDocument(BaseModel):
+    """MongoDB document schema for AI prompts collection"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    user_id: PyObjectId
+    name: str
+    description: Optional[str] = None
+    prompt_text: str
+    is_default: bool = False
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
 class CampaignDocument(BaseModel):
     """MongoDB document schema for campaigns collection"""
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
@@ -103,6 +121,7 @@ class CampaignDocument(BaseModel):
     name: str
     csv_source: str
     template_id: PyObjectId
+    prompt_id: Optional[PyObjectId] = None  # AI prompt for auto-replies (None = system default)
     status: str  # 'queued', 'running', 'paused', 'completed', 'failed', 'cancelled'
     total_contacts: int = 0
     processed: int = 0

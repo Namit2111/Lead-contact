@@ -7,6 +7,7 @@ class CreateCampaignRequest(BaseModel):
     """Request to create and queue email campaign via Trigger.dev"""
     csv_source: str
     template_id: str
+    prompt_id: Optional[str] = None  # AI prompt for auto-replies (None = system default)
     name: Optional[str] = None  # Auto-generated if not provided
 
 
@@ -43,6 +44,7 @@ class CampaignItem(BaseModel):
     name: str
     csv_source: str
     template_id: str
+    prompt_id: Optional[str] = None  # AI prompt for auto-replies
     status: str
     total_contacts: int
     processed: int

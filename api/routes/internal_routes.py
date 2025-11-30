@@ -10,7 +10,8 @@ from db.repository_factory import (
     get_email_log_repository, 
     get_conversation_repository, 
     get_campaign_repository,
-    get_provider_token_repository
+    get_provider_token_repository,
+    get_prompt_repository
 )
 from utils.logger import logger
 
@@ -117,21 +118,30 @@ async def get_auto_reply_campaigns(user_id: str = Query(...)):
     """Get campaigns with auto-reply enabled for a user"""
     try:
         campaign_repo = await get_campaign_repository()
+        prompt_repo = await get_prompt_repository()
         campaigns = await campaign_repo.get_campaigns_with_auto_reply(user_id)
         
-        return {
-            "campaigns": [
-                {
-                    "id": c.id,
-                    "user_id": c.user_id,
-                    "auto_reply_enabled": c.auto_reply_enabled,
-                    "auto_reply_subject": c.auto_reply_subject,
-                    "auto_reply_body": c.auto_reply_body,
-                    "max_replies_per_thread": c.max_replies_per_thread,
-                }
-                for c in campaigns
-            ]
-        }
+        result_campaigns = []
+        for c in campaigns:
+            # Fetch prompt text if campaign has a prompt_id
+            prompt_text = None
+            if c.prompt_id:
+                prompt = await prompt_repo.get_by_id(c.prompt_id)
+                if prompt:
+                    prompt_text = prompt.prompt_text
+            
+            result_campaigns.append({
+                "id": c.id,
+                "user_id": c.user_id,
+                "auto_reply_enabled": c.auto_reply_enabled,
+                "auto_reply_subject": c.auto_reply_subject,
+                "auto_reply_body": c.auto_reply_body,
+                "max_replies_per_thread": c.max_replies_per_thread,
+                "prompt_id": c.prompt_id,
+                "prompt_text": prompt_text,  # Custom prompt text (None = use system default)
+            })
+        
+        return {"campaigns": result_campaigns}
     except Exception as e:
         logger.error(f"Error fetching auto-reply campaigns: {str(e)}")
         return {"campaigns": []}

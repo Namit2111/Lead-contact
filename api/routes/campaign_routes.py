@@ -64,12 +64,23 @@ async def send_campaign(
         # Auto-generate campaign name if not provided
         campaign_name = request.name or f"Campaign - {template.name} - {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
         
+        # Validate prompt if provided
+        if request.prompt_id:
+            from db.repository_factory import get_prompt_repository
+            prompt_repo = await get_prompt_repository()
+            prompt = await prompt_repo.get_by_id(request.prompt_id)
+            if not prompt:
+                raise HTTPException(status_code=404, detail="Prompt not found")
+            if prompt.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied to prompt")
+        
         # Create campaign record
         campaign = await campaign_repo.create_campaign(
             user_id=user_id,
             name=campaign_name,
             csv_source=request.csv_source,
             template_id=request.template_id,
+            prompt_id=request.prompt_id,
             total_contacts=total_contacts,
             status="queued"
         )
@@ -154,6 +165,7 @@ async def list_campaigns(
                 name=c.name,
                 csv_source=c.csv_source,
                 template_id=c.template_id,
+                prompt_id=c.prompt_id,
                 status=c.status,
                 total_contacts=c.total_contacts,
                 processed=c.processed,
@@ -261,6 +273,7 @@ async def get_campaign(
             name=campaign.name,
             csv_source=campaign.csv_source,
             template_id=campaign.template_id,
+            prompt_id=campaign.prompt_id,
             status=campaign.status,
             total_contacts=campaign.total_contacts,
             processed=campaign.processed,
@@ -488,11 +501,13 @@ class UpdateAutoReplyRequest(BaseModel):
     subject: Optional[str] = None
     body: Optional[str] = None
     max_replies: Optional[int] = None
+    prompt_id: Optional[str] = None  # AI prompt ID (null to keep current, empty string to clear)
 
 
 class AutoReplySettingsResponse(BaseModel):
     """Response with auto-reply settings"""
     auto_reply_enabled: bool
+    prompt_id: Optional[str] = None
     auto_reply_subject: str
     auto_reply_body: str
     max_replies_per_thread: int
@@ -555,7 +570,8 @@ async def update_auto_reply_settings(
             enabled=request.enabled,
             subject=request.subject,
             body=request.body,
-            max_replies=request.max_replies
+            max_replies=request.max_replies,
+            prompt_id=request.prompt_id
         )
         
         if not updated:
@@ -566,7 +582,8 @@ async def update_auto_reply_settings(
             auto_reply_subject=updated.auto_reply_subject,
             auto_reply_body=updated.auto_reply_body,
             max_replies_per_thread=updated.max_replies_per_thread,
-            replies_count=updated.replies_count
+            replies_count=updated.replies_count,
+            prompt_id=updated.prompt_id
         )
         
     except HTTPException:

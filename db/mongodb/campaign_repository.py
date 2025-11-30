@@ -25,6 +25,7 @@ class MongoCampaignRepository(CampaignRepository):
             name=doc["name"],
             csv_source=doc["csv_source"],
             template_id=str(doc["template_id"]),
+            prompt_id=str(doc["prompt_id"]) if doc.get("prompt_id") else None,
             status=doc["status"],
             total_contacts=doc["total_contacts"],
             processed=doc["processed"],
@@ -51,7 +52,8 @@ class MongoCampaignRepository(CampaignRepository):
         csv_source: str,
         template_id: str,
         total_contacts: int,
-        status: str = "queued"
+        status: str = "queued",
+        prompt_id: Optional[str] = None
     ) -> Campaign:
         """Create a new campaign"""
         try:
@@ -60,6 +62,7 @@ class MongoCampaignRepository(CampaignRepository):
                 name=name,
                 csv_source=csv_source,
                 template_id=PyObjectId(template_id),
+                prompt_id=PyObjectId(prompt_id) if prompt_id else None,
                 status=status,
                 total_contacts=total_contacts,
                 processed=0,
@@ -243,7 +246,8 @@ class MongoCampaignRepository(CampaignRepository):
         enabled: bool,
         subject: Optional[str] = None,
         body: Optional[str] = None,
-        max_replies: Optional[int] = None
+        max_replies: Optional[int] = None,
+        prompt_id: Optional[str] = None
     ) -> Optional[Campaign]:
         """Update auto-reply settings for a campaign"""
         try:
@@ -257,6 +261,12 @@ class MongoCampaignRepository(CampaignRepository):
                 update_data["auto_reply_body"] = body
             if max_replies is not None:
                 update_data["max_replies_per_thread"] = max_replies
+            # Handle prompt_id - empty string means clear it
+            if prompt_id is not None:
+                if prompt_id == "":
+                    update_data["prompt_id"] = None
+                else:
+                    update_data["prompt_id"] = ObjectId(prompt_id)
 
             result = await self.collection.find_one_and_update(
                 {"_id": ObjectId(campaign_id)},
