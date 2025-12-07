@@ -32,7 +32,10 @@ async def test_calcom_integration():
         event_types = await client.get_event_types()
         print(f"✅ Found {len(event_types)} event types:")
         for et in event_types:
-            print(f"   - {et.get('title')} ({et.get('length')} min) - ID: {et.get('id')}, Slug: {et.get('slug')}")
+            title = et.get("title") or et.get("name")
+            duration = et.get("length") or et.get("duration")
+            slug = et.get("slug") or et.get("slugPath")
+            print(f"   - {title} ({duration} min) - ID: {et.get('id')}, Slug: {slug}")
         
         if not event_types:
             print("❌ No event types found. Please create an event type in Cal.com first.")
@@ -41,7 +44,7 @@ async def test_calcom_integration():
         # Select first event type
         selected_type = event_types[0]
         event_type_id = selected_type.get('id')
-        print(f"\n📅 Using event type: {selected_type.get('title')} (ID: {event_type_id})")
+        print(f"\n📅 Using event type: {(selected_type.get('title') or selected_type.get('name'))} (ID: {event_type_id})")
         
         # Test 3: Get availability
         print("\n3️⃣ Testing: Get availability (next 7 days)...")
@@ -57,7 +60,9 @@ async def test_calcom_integration():
         print(f"✅ Found {len(slots)} available slots:")
         for i, slot in enumerate(slots[:10], 1):  # Show first 10
             if isinstance(slot, dict):
-                print(f"   {i}. {slot.get('date')} at {slot.get('time')}")
+                start = slot.get("start") or slot.get("time")
+                end = slot.get("end") or slot.get("endTime")
+                print(f"   {i}. {start} - {end}")
         
         if len(slots) > 10:
             print(f"   ... and {len(slots) - 10} more slots")
@@ -117,9 +122,9 @@ async def test_backend_endpoints():
     
     async with httpx.AsyncClient() as client:
         # Test calendar status
-        print("\n1️⃣ Testing: GET /api/calendar/status")
+        print("\n1️⃣ Testing: GET /calendar/status")
         response = await client.get(
-            f"{base_url}/api/calendar/status",
+            f"{base_url}/calendar/status",
             headers={"X-User-Id": user_id}
         )
         print(f"   Status: {response.status_code}")

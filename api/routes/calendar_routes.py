@@ -1,53 +1,25 @@
 from fastapi import APIRouter, Header, HTTPException
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime, timedelta
 import httpx
+
 from db.mongodb.calendar_repository import MongoCalendarRepository
 from integrations.calcom_client import CalComClient
 from utils.logger import logger
+from core.calendar.models import (
+    ConnectCalendarRequest,
+    CalendarStatusResponse,
+    EventTypeItem,
+    EventTypesResponse,
+    UpdateEventTypeRequest,
+    CalendarSlot,
+    AvailabilityResponse,
+    BookMeetingRequest,
+    BookingResponse
+)
 
 
 router = APIRouter(prefix="/calendar")
-
-
-# Request/Response Models
-class ConnectCalendarRequest(BaseModel):
-    """Request to connect calendar"""
-    api_key: str
-    event_type_id: Optional[int] = None
-    event_type_slug: Optional[str] = None
-    event_type_name: Optional[str] = None
-
-
-class CalendarStatusResponse(BaseModel):
-    """Response with calendar connection status"""
-    connected: bool
-    provider: Optional[str] = None
-    username: Optional[str] = None
-    event_type_id: Optional[int] = None
-    event_type_slug: Optional[str] = None
-    event_type_name: Optional[str] = None
-
-
-class EventTypeItem(BaseModel):
-    """Single event type"""
-    id: int
-    slug: str
-    title: str
-    length: int  # Duration in minutes
-    description: Optional[str] = None
-
-
-class EventTypesResponse(BaseModel):
-    """Response with event types"""
-    event_types: list[EventTypeItem]
-
-
-class UpdateEventTypeRequest(BaseModel):
-    """Request to update event type"""
-    event_type_id: int
-    event_type_slug: str
-    event_type_name: str
 
 
 def get_user_id_from_header(x_user_id: Optional[str] = Header(None)) -> str:
@@ -57,6 +29,7 @@ def get_user_id_from_header(x_user_id: Optional[str] = Header(None)) -> str:
     return x_user_id
 
 
+# works fine 
 @router.post("/connect", response_model=CalendarStatusResponse)
 async def connect_calendar(
     request: ConnectCalendarRequest,
@@ -100,8 +73,8 @@ async def connect_calendar(
                 if event_types:
                     first_type = event_types[0]
                     request.event_type_id = first_type.get("id")
-                    request.event_type_slug = first_type.get("slug")
-                    request.event_type_name = first_type.get("title")
+                    request.event_type_slug = first_type.get("slug") or first_type.get("slugPath")
+                    request.event_type_name = first_type.get("title") or first_type.get("name")
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 401:
                     raise HTTPException(
@@ -145,6 +118,11 @@ async def connect_calendar(
     except Exception as e:
         logger.error(f"Error connecting calendar: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_event_type_from_token(token: dict, client: CalComClient):
+    """Return event type info, fetching first event if missing"""
+    return token.get("event_type_id"), token.get("event_type_slug"), token.get("event_type_name")
 
 
 @router.get("/status", response_model=CalendarStatusResponse)
@@ -195,9 +173,9 @@ async def get_event_types(
         event_items = [
             EventTypeItem(
                 id=et.get("id"),
-                slug=et.get("slug", ""),
-                title=et.get("title", ""),
-                length=et.get("length", 30),
+                slug=et.get("slug", "") or et.get("slugPath", ""),
+                title=et.get("title", "") or et.get("name", ""),
+                length=et.get("length", 30) or et.get("duration", 30),
                 description=et.get("description")
             )
             for et in event_types
@@ -216,6 +194,174 @@ async def get_event_types(
         raise HTTPException(status_code=400, detail=f"Cal.com API error: {e.response.text}")
     except Exception as e:
         logger.error(f"Error getting event types: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/availability", response_model=AvailabilityResponse)
+async def get_availability(
+    days: int = 14,
+    timezone: str = "UTC",
+    x_user_id: Optional[str] = Header(None)
+):
+    """Get available slots for the stored Cal.com connection"""
+    user_id = get_user_id_from_header(x_user_id)
+
+    try:
+        calendar_repo = MongoCalendarRepository()
+        token = await calendar_repo.get_by_user(user_id, "cal.com")
+
+        if not token:
+            return AvailabilityResponse(
+                connected=False,
+                error="Calendar not connected"
+            )
+
+        client = CalComClient(token["api_key"])
+
+        # Determine event type (fallback to first available) and capture duration if present
+        event_type_id = token.get("event_type_id")
+        event_type_name = token.get("event_type_name")
+        event_type_slug = token.get("event_type_slug")
+        event_type_duration = None
+
+        event_types_cache = None
+
+        if not event_type_id:
+            event_types_cache = await client.get_event_types()
+            if not event_types_cache:
+                return AvailabilityResponse(
+                    connected=False,
+                    error="No event types found for this Cal.com account"
+                )
+            first_type = event_types_cache[0]
+            event_type_id = first_type.get("id")
+            event_type_name = first_type.get("title") or first_type.get("name")
+            event_type_slug = first_type.get("slug") or first_type.get("slugPath")
+            event_type_duration = first_type.get("length") or first_type.get("duration")
+        else:
+            # Try to fetch duration for this event type
+            try:
+                event_types_cache = await client.get_event_types()
+                for et in event_types_cache or []:
+                    if et.get("id") == event_type_id:
+                        event_type_duration = et.get("length") or et.get("duration")
+                        if not event_type_name:
+                            event_type_name = et.get("title") or et.get("name")
+                        if not event_type_slug:
+                            event_type_slug = et.get("slug") or et.get("slugPath")
+                        break
+            except Exception:
+                event_type_duration = None
+
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=max(1, days))
+
+        slots = await client.get_availability(
+            event_type_id=event_type_id,
+            start_date=start_date,
+            end_date=end_date,
+            timezone=timezone,
+            duration=event_type_duration
+        )
+
+        def _parse_iso(value: str) -> datetime:
+            if value.endswith("Z"):
+                value = value.replace("Z", "+00:00")
+            return datetime.fromisoformat(value)
+
+        formatted_slots = []
+        default_duration = event_type_duration or 30
+
+        for slot in slots:
+            start_raw = slot.get("start") or slot.get("time")
+            end_raw = slot.get("end") or slot.get("endTime")
+            slot_tz = slot.get("timeZone") or slot.get("time_zone") or timezone
+            if not start_raw:
+                continue
+            start_dt = _parse_iso(start_raw)
+            if end_raw:
+                end_dt = _parse_iso(end_raw)
+            else:
+                end_dt = start_dt + timedelta(minutes=default_duration)
+
+            formatted_slots.append(
+                CalendarSlot(
+                    start=start_dt,
+                    end=end_dt,
+                    time_zone=slot_tz
+                )
+            )
+
+        return AvailabilityResponse(
+            connected=True,
+            event_type_id=event_type_id,
+            event_type_name=event_type_name,
+            booking_link=f"https://cal.com/{token.get('username')}/{event_type_slug}" if event_type_slug else None,
+            slots=formatted_slots
+        )
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Cal.com API error: HTTP {e.response.status_code} - {e.response.text}")
+        if e.response.status_code == 401:
+            raise HTTPException(status_code=400, detail="Invalid Cal.com API key. Please reconnect your calendar.")
+        raise HTTPException(status_code=400, detail=f"Cal.com API error: {e.response.text}")
+    except Exception as e:
+        logger.error(f"Error getting availability: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/book", response_model=BookingResponse)
+async def book_meeting(
+    request: BookMeetingRequest,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Book a meeting using stored Cal.com credentials"""
+    user_id = get_user_id_from_header(x_user_id)
+
+    try:
+        calendar_repo = MongoCalendarRepository()
+        token = await calendar_repo.get_by_user(user_id, "cal.com")
+
+        if not token:
+            raise HTTPException(status_code=404, detail="Calendar not connected")
+
+        client = CalComClient(token["api_key"])
+
+        event_type_id = request.event_type_id or token.get("event_type_id")
+        if not event_type_id:
+            event_types = await client.get_event_types()
+            if not event_types:
+                raise HTTPException(status_code=400, detail="No event types available to book")
+            event_type_id = event_types[0].get("id")
+
+        result = await client.create_booking(
+            event_type_id=event_type_id,
+            start_time=request.start,
+            end_time=request.end,
+            attendee_email=request.attendee_email,
+            attendee_name=request.attendee_name,
+            notes=request.notes,
+            timezone=request.time_zone
+        )
+
+        booking_data = result.get("data", result)
+
+        return BookingResponse(
+            success=True,
+            booking_id=str(booking_data.get("id")) if booking_data.get("id") else None,
+            booking_url=booking_data.get("url") or booking_data.get("bookingUrl")
+        )
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Cal.com API error: HTTP {e.response.status_code} - {e.response.text}")
+        detail = e.response.text
+        if e.response.status_code == 401:
+            detail = "Invalid Cal.com API key. Please reconnect your calendar."
+        raise HTTPException(status_code=400, detail=detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error booking meeting: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
