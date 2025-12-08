@@ -9,9 +9,9 @@ class TriggerClient:
     
     def __init__(self):
         # Use tr_dev_... for local testing, tr_prod_... for production
-        self.api_key = getattr(settings, 'TRIGGER_API_KEY', "tr_dev_e6c6siL9DWjk3DbnoNN1")
+        self.api_key = getattr(settings, 'trigger_api_key')
         self.api_url = getattr(settings, 'TRIGGER_API_URL', 'https://api.trigger.dev')
-        
+  
         if not self.api_key:
             logger.warning("TRIGGER_API_KEY not set in environment variables")
     
