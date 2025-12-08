@@ -51,7 +51,7 @@ class TriggerClient:
                 "csvSource": csv_source,
                 "templateId": template_id,
                 "accessToken": access_token,
-                "backendUrl": getattr(settings, 'BACKEND_URL', 'http://localhost:8000')
+                "backendUrl": settings.backend_url
             }
             
             # Add refresh token and expiry if provided (for token refresh support)
