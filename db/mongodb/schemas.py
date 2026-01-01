@@ -224,6 +224,7 @@ class CalendarTokenDocument(BaseModel):
     event_type_slug: Optional[str] = None  # Selected event type slug (e.g., "30min")
     event_type_name: Optional[str] = None  # Selected event type name
     is_active: bool = True
+    cal_tools_enabled: bool = True  # Whether AI bot can use calendar tools (get availability, book meetings)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

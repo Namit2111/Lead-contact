@@ -15,7 +15,8 @@ from core.calendar.models import (
     CalendarSlot,
     AvailabilityResponse,
     BookMeetingRequest,
-    BookingResponse
+    BookingResponse,
+    ToggleCalToolsRequest
 )
 
 
@@ -101,7 +102,8 @@ async def connect_calendar(
             username=token["username"],
             event_type_id=token["event_type_id"],
             event_type_slug=token["event_type_slug"],
-            event_type_name=token["event_type_name"]
+            event_type_name=token["event_type_name"],
+            cal_tools_enabled=token.get("cal_tools_enabled", True)
         )
 
     except HTTPException:
@@ -145,11 +147,49 @@ async def get_calendar_status(
             username=token["username"],
             event_type_id=token["event_type_id"],
             event_type_slug=token["event_type_slug"],
-            event_type_name=token["event_type_name"]
+            event_type_name=token["event_type_name"],
+            cal_tools_enabled=token.get("cal_tools_enabled", True)
         )
 
     except Exception as e:
         logger.error(f"Error getting calendar status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/toggle-tools", response_model=CalendarStatusResponse)
+async def toggle_calendar_tools(
+    request: ToggleCalToolsRequest,
+    x_user_id: Optional[str] = Header(None)
+):
+    """Toggle AI calendar tools (get availability, book meetings)"""
+    user_id = get_user_id_from_header(x_user_id)
+
+    try:
+        calendar_repo = MongoCalendarRepository()
+        token = await calendar_repo.get_by_user(user_id, "cal.com")
+
+        if not token:
+            raise HTTPException(status_code=404, detail="Calendar not connected")
+
+        updated = await calendar_repo.toggle_cal_tools(user_id, request.enabled)
+
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update toggle")
+
+        return CalendarStatusResponse(
+            connected=True,
+            provider="cal.com",
+            username=updated["username"],
+            event_type_id=updated["event_type_id"],
+            event_type_slug=updated["event_type_slug"],
+            event_type_name=updated["event_type_name"],
+            cal_tools_enabled=updated["cal_tools_enabled"]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling calendar tools: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -396,7 +436,8 @@ async def update_event_type(
             username=updated["username"],
             event_type_id=updated["event_type_id"],
             event_type_slug=updated["event_type_slug"],
-            event_type_name=updated["event_type_name"]
+            event_type_name=updated["event_type_name"],
+            cal_tools_enabled=updated.get("cal_tools_enabled", True)
         )
 
     except Exception as e:

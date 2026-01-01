@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     google_client_secret: str
     google_redirect_uri: str
 
+    # Google AI (Gemini) settings
+    google_generative_ai_api_key: Optional[str] = None
+
     # MongoDB settings
     mongo_uri: str
     mongo_db_name: str

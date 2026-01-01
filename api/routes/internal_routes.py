@@ -122,7 +122,15 @@ async def get_auto_reply_campaigns(user_id: str = Query(...)):
     try:
         campaign_repo = await get_campaign_repository()
         prompt_repo = await get_prompt_repository()
+        calendar_repo = MongoCalendarRepository()
+        
         campaigns = await campaign_repo.get_campaigns_with_auto_reply(user_id)
+        
+        # Get calendar settings for this user (check if calendar tools are enabled)
+        calendar_token = await calendar_repo.get_by_user(user_id, "cal.com")
+        cal_tools_enabled = False
+        if calendar_token:
+            cal_tools_enabled = calendar_token.get("cal_tools_enabled", True)
         
         result_campaigns = []
         for c in campaigns:
@@ -142,6 +150,7 @@ async def get_auto_reply_campaigns(user_id: str = Query(...)):
                 "max_replies_per_thread": c.max_replies_per_thread,
                 "prompt_id": c.prompt_id,
                 "prompt_text": prompt_text,  # Custom prompt text (None = use system default)
+                "cal_tools_enabled": cal_tools_enabled,  # Whether AI can use calendar tools
             })
         
         return {"campaigns": result_campaigns}

@@ -27,6 +27,7 @@ class MongoCalendarRepository:
             "event_type_slug": doc.get("event_type_slug"),
             "event_type_name": doc.get("event_type_name"),
             "is_active": doc.get("is_active", True),
+            "cal_tools_enabled": doc.get("cal_tools_enabled", True),  # Default to enabled
             "created_at": doc["created_at"],
             "updated_at": doc["updated_at"]
         }
@@ -120,6 +121,27 @@ class MongoCalendarRepository:
             return_document=True
         )
         if result:
+            return self._document_to_dict(result)
+        return None
+
+    async def toggle_cal_tools(
+        self,
+        user_id: str,
+        enabled: bool
+    ) -> Optional[Dict[str, Any]]:
+        """Toggle AI calendar tools (get availability, book meetings)"""
+        result = await self.collection.find_one_and_update(
+            {"user_id": ObjectId(user_id), "provider": "cal.com"},
+            {
+                "$set": {
+                    "cal_tools_enabled": enabled,
+                    "updated_at": datetime.utcnow()
+                }
+            },
+            return_document=True
+        )
+        if result:
+            logger.info(f"Cal tools {'enabled' if enabled else 'disabled'} for user {user_id}")
             return self._document_to_dict(result)
         return None
 

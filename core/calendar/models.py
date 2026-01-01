@@ -18,6 +18,12 @@ class CalendarStatusResponse(BaseModel):
     event_type_id: Optional[int] = None
     event_type_slug: Optional[str] = None
     event_type_name: Optional[str] = None
+    cal_tools_enabled: Optional[bool] = True  # Whether AI can use calendar tools
+
+
+class ToggleCalToolsRequest(BaseModel):
+    """Request to toggle AI calendar tools"""
+    enabled: bool
 
 
 class EventTypeItem(BaseModel):
